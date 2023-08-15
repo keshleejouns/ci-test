@@ -62,3 +62,15 @@ workflows:
       #     filters:
       #       branches:
       #         only: master # only deploy when on main/master
+      obs:
+  example-job:
+    docker:
+      # replace with your preferred image
+      - image: cimg/base:stable
+    steps:
+      - slack/notify:
+          custom: '1' 
+workflows:
+  example-workflow:
+    jobs:
+      - example-job
