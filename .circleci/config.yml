@@ -1,76 +1,54 @@
-version: 2.1
-orbs:
-  node: circleci/node@4.7.0
-  heroku: circleci/heroku@1.2.6
-
+name: Ci Long Night
 jobs:
-  build_and_test:
-    docker:
-      - image: cimg/node:17.2.0
+  Frontend - Build:
     steps:
-      - checkout
-      - node/install-packages:
-          pkg-manager: yarn
-      - run:
-          command: yarn test
-          name: Run tests
-      - run:
-          command: yarn build
-          name: Build app
-      - persist_to_workspace:
-          root: ~/project
-          paths:
-            - .
-  deploy: # this can be any name you choose
-    docker:
-      - image: cimg/node:17.2.0
+      - type: node-js
+        working-directory: alarm-frontend
+        shell-script: npm ci
+        plugin.docker.imageId: node:lts
+      - type: node-js
+        working-directory: alarm-frontend
+        shell-script: npm run build
+        plugin.docker.imageId: node:lts
+      - type: gradle
+    runs-on: Linux-Medium
+    integrations:
+      - Docker
+    files-publication:
+      - alarm-frontend/build/*
+  Publish artifacts:
+    runs-on: Linux-Medium
+    dependencies:
+      - Frontend - Build:
+          files:
+            - alarm-frontend/build/*
+    integrations:
+      - Docker
     steps:
-      - attach_workspace:
-          at: ~/project
-      - heroku/deploy-via-git: 
-          force: true # force push when pushing to the heroku remote, see: https://devcenter.heroku.com/articles/git
-
-workflows:
-  on_commit:
-    jobs:
-      - build_and_test
-      # Follow instructions here to authenticate git for Heroku: https://devcenter.heroku.com/articles/git#http-git-authentication
-      # The following code may be uncommented, onnce HEROKU_API_KEY & HEROKU_APP_NAME environemnt variables are present
-      # Read more: https://circleci.com/docs/2.0/env-vars/
-      # - deploy:
-      #     requires:
-      #       - build_and_test # only deploy if the build_and_test job has completed
-      #     filters:
-      #       branches:
-      #         only: master # only deploy when on main/master
-  nightly:
-    triggers:
-      - schedule:
-          cron: "0 0 * * *"       
-          filters:
-            branches:
-              only:
-                - master
-    jobs:
-      - build_and_test
-      # Follow instructions here to authenticate git for Heroku: https://devcenter.heroku.com/articles/git#http-git-authentication
-      # The following code may be uncommented, onnce HEROKU_API_KEY & HEROKU_APP_NAME environemnt variables are present
-      # Read more: https://circleci.com/docs/2.0/env-vars/
-      # - deploy:
-      #     requires:
-      #       - build_and_test # only deploy if the build_and_test job has completed
-      #     filters:
-      #       branches:
-      #         only: master # only deploy when on main/master
-      obs:
-  example-job:
-    docker:
-      # replace with your preferred image
-      - image: cimg/base:stable
+      - type: script
+        script-content: ls -lahR
+        working-directory: alarm-frontend/build
+  Backend - Build:
+    runs-on: Linux-Medium
     steps:
-      - slack/notify:
-          custom: '1' 
-workflows:
-  example-workflow:
-    jobs:
-      - example-job
+      - type: gradle
+        script-content: gradle
+        tasks: clean build
+        working-directory: alarm-management
+        plugin.docker.imageId: gradle:jdk17
+        use-gradle-wrapper: 'true'
+    files-publication:
+      - '**/*'
+    parallelism: 2
+  Backend - Deploy:
+    runs-on: Linux-Medium
+    dependencies:
+      - Backend - Build:
+          files:
+            - '**/*'
+    steps:
+      - type: script
+        working-directory: alarm-management/build
+        script-content: ls -lahR
+parameters:
+  Browesr: eqweklqew
